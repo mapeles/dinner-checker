@@ -16,7 +16,7 @@ import {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { nfcId, studentId, password } = body;
+    const { nfcId, studentId, password, photoPath } = body;
 
     let student = null;
 
@@ -126,6 +126,7 @@ export async function POST(request: NextRequest) {
         studentId: student.studentId,
         date: dateString,
         isApplicant,
+        photoPath: photoPath || null, // 사진 경로 저장
       },
     });
 

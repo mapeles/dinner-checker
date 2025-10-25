@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
         isDuplicate, // 신청자의 중복 태깅 여부
         checkTime: checkIn.checkTime,
         checkCount: currentCount + 1, // 해당 학생의 몇 번째 체크인인지
+        photoPath: checkIn.photoPath, // 사진 경로 추가
       };
     });
 

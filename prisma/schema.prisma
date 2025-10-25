@@ -40,6 +40,7 @@ model CheckIn {
   date        String   // "2025-10-25" 형식
   isApplicant Boolean  // 체크인 당시 신청자 여부
   checkTime   DateTime @default(now())
+  photoPath   String?  // 체크인 시 촬영된 사진 경로 (예: "2025-10-25/20701_1729845600000.jpg")
   
   @@index([studentId, date])
   @@index([date])

@@ -28,9 +28,16 @@ export default function Home() {
   const [password, setPassword] = useState('');
   const [history, setHistory] = useState<CheckHistory[]>([]);
   const [bgColor, setBgColor] = useState('from-blue-50 to-indigo-100'); // 배경색 상태
+  
+  // 카메라 관련 state
+  const [cameraEnabled, setCameraEnabled] = useState(false);
+  const [cameraError, setCameraError] = useState('');
 
   const inputRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   // 오늘 날짜 가져오기
   const getTodayDate = () => {
@@ -73,6 +80,138 @@ export default function Home() {
     const interval = setInterval(loadTodayCheckIns, 30000);
     
     return () => clearInterval(interval);
+  }, []);
+
+  // 카메라 초기화
+  const initCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: 'user' 
+        } 
+      });
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        streamRef.current = stream;
+        
+        // 비디오가 실제로 재생되기를 기다림
+        await new Promise<void>((resolve) => {
+          if (videoRef.current) {
+            videoRef.current.onloadedmetadata = () => {
+              videoRef.current?.play();
+              // 비디오가 재생되고 안정화될 시간을 줌
+              setTimeout(() => resolve(), 500);
+            };
+          }
+        });
+        
+        setCameraEnabled(true);
+        setCameraError('');
+        console.log('카메라 초기화 완료');
+      }
+    } catch (err) {
+      console.error('Camera access error:', err);
+      setCameraError('카메라 접근 권한이 필요합니다.');
+      setCameraEnabled(false);
+    }
+  };
+
+  // 카메라 정지
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    setCameraEnabled(false);
+  };
+
+  // 사진 촬영 함수
+  const capturePhoto = async (studentId: string): Promise<string | null> => {
+    if (!videoRef.current || !canvasRef.current || !cameraEnabled) {
+      console.log('카메라가 준비되지 않음');
+      return null;
+    }
+
+    try {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      
+      // 비디오가 실제로 재생 중인지 확인
+      if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+        console.log('비디오 데이터 대기 중...');
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      const context = canvas.getContext('2d');
+      if (!context) return null;
+
+      // 캔버스 크기를 비디오 크기에 맞춤
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      console.log('촬영 크기:', canvas.width, 'x', canvas.height);
+
+      // 비디오가 유효한 크기를 가지고 있는지 확인
+      if (canvas.width === 0 || canvas.height === 0) {
+        console.error('비디오 크기가 0입니다. 카메라가 준비되지 않았습니다.');
+        return null;
+      }
+
+      // 비디오 프레임을 캔버스에 그리기
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // 캔버스를 Blob으로 변환
+      const blob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob(resolve, 'image/jpeg', 0.9);
+      });
+
+      if (!blob) {
+        console.error('Blob 생성 실패');
+        return null;
+      }
+
+      console.log('사진 크기:', blob.size, 'bytes');
+
+      // FormData 생성
+      const formData = new FormData();
+      formData.append('image', blob, 'photo.jpg');
+      formData.append('date', getTodayDate());
+      formData.append('studentId', studentId);
+
+      // 서버에 업로드
+      const response = await fetch('/api/camera/capture', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.photoPath) {
+        console.log('사진 저장 성공:', data.photoPath);
+        return data.photoPath;
+      }
+
+      console.error('사진 저장 실패:', data);
+      return null;
+    } catch (err) {
+      console.error('Photo capture error:', err);
+      return null;
+    }
+  };
+
+  // 컴포넌트 언마운트 시 카메라 정지
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, []);
+  
+  // 컴포넌트 마운트 시 카메라 자동 시작
+  useEffect(() => {
+    initCamera();
   }, []);
 
   // 효과음 재생 함수
@@ -230,10 +369,14 @@ export default function Home() {
     setError('');
 
     try {
+      // 사진 촬영 (학번을 모르므로 nfcId로 임시 저장)
+      let photoPath: string | null = null;
+      photoPath = await capturePhoto(nfcId);
+
       const response = await fetch('/api/nfc/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nfcId }),
+        body: JSON.stringify({ nfcId, photoPath }),
       });
 
       const data = await response.json();
@@ -299,10 +442,13 @@ export default function Home() {
     setError('');
 
     try {
+      // 사진 촬영
+      const photoPath = await capturePhoto(studentId);
+
       const response = await fetch('/api/nfc/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentId, password }),
+        body: JSON.stringify({ studentId, password, photoPath }),
       });
 
       const data = await response.json();
@@ -362,6 +508,18 @@ export default function Home() {
 
   return (
     <div className={`min-h-screen bg-linear-to-br ${bgColor} transition-colors duration-500 p-4`}>
+      {/* 숨겨진 카메라 (렌더링은 되지만 보이지 않음) */}
+      <div className="fixed top-0 left-0 opacity-0 pointer-events-none w-0 h-0 overflow-hidden">
+        <video 
+          ref={videoRef} 
+          autoPlay 
+          playsInline 
+          muted
+          className="w-full h-full object-cover"
+        />
+        <canvas ref={canvasRef} className="hidden" />
+      </div>
+
       <div className="max-w-7xl mx-auto">
         {/* 헤더 */}
         <div className="text-center m-6">
@@ -373,6 +531,7 @@ export default function Home() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* 왼쪽: 입력 영역 */}
           <div>
+
             {/* 메인 입력 카드 */}
             <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
               {!showPasswordInput ? (

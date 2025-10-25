@@ -35,6 +35,7 @@ export default function AdminPage() {
   // 체크인 기록 관련
   const [checkIns, setCheckIns] = useState<any[]>([]);
   const [checkInDate, setCheckInDate] = useState('');
+  const [selectedCheckIn, setSelectedCheckIn] = useState<any>(null); // 선택된 체크인 (모달용)
 
   // 백업 관련
   const [backups, setBackups] = useState<any[]>([]);
@@ -982,12 +983,13 @@ export default function AdminPage() {
                   checkIns.map((checkIn) => (
                     <div
                       key={checkIn.id}
-                      className={`border-2 rounded-lg p-4 ${
+                      onClick={() => setSelectedCheckIn(checkIn)}
+                      className={`border-2 rounded-lg p-4 cursor-pointer transition-all hover:shadow-lg ${
                         checkIn.isDuplicate
-                          ? 'bg-orange-50 border-orange-200'
+                          ? 'bg-orange-50 border-orange-200 hover:border-orange-400'
                           : checkIn.isApplicant
-                          ? 'bg-green-50 border-green-200'
-                          : 'bg-red-50 border-red-200'
+                          ? 'bg-green-50 border-green-200 hover:border-green-400'
+                          : 'bg-red-50 border-red-200 hover:border-red-400'
                       }`}
                     >
                       <div className="flex justify-between items-center">
@@ -1008,6 +1010,9 @@ export default function AdminPage() {
                           </p>
                           <p className="text-sm text-gray-500">
                             {new Date(checkIn.checkTime).toLocaleTimeString('ko-KR')}
+                            {checkIn.photoPath && (
+                              <span className="ml-2 text-xs text-blue-600">📷 사진 있음</span>
+                            )}
                           </p>
                         </div>
                         <div className={`px-4 py-2 rounded-lg font-semibold ${
@@ -1311,6 +1316,112 @@ export default function AdminPage() {
           </div>
         )}
       </div>
+
+      {/* 체크인 상세 모달 */}
+      {selectedCheckIn && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={() => setSelectedCheckIn(null)}
+        >
+          <div 
+            className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-2xl font-bold text-gray-800">📋 입장 기록 상세</h3>
+              <button
+                onClick={() => setSelectedCheckIn(null)}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* 학생 정보 */}
+            <div className={`p-4 rounded-lg mb-4 ${
+              selectedCheckIn.isDuplicate
+                ? 'bg-orange-50 border-2 border-orange-200'
+                : selectedCheckIn.isApplicant
+                ? 'bg-green-50 border-2 border-green-200'
+                : 'bg-red-50 border-2 border-red-200'
+            }`}>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-600">학생</p>
+                  <p className="text-xl font-bold text-gray-800">
+                    {selectedCheckIn.studentInfo.formatted}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">학번</p>
+                  <p className="text-xl font-bold text-gray-800">
+                    {selectedCheckIn.studentId}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">입장 시간</p>
+                  <p className="text-lg font-semibold text-gray-800">
+                    {new Date(selectedCheckIn.checkTime).toLocaleString('ko-KR')}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">상태</p>
+                  <p className={`text-lg font-bold ${
+                    selectedCheckIn.isDuplicate
+                      ? 'text-orange-700'
+                      : selectedCheckIn.isApplicant
+                      ? 'text-green-700'
+                      : 'text-red-700'
+                  }`}>
+                    {selectedCheckIn.isDuplicate 
+                      ? '⚠️ 중복 입장' 
+                      : selectedCheckIn.isApplicant 
+                      ? '✓ 신청자' 
+                      : '✗ 미신청자'}
+                  </p>
+                </div>
+                {selectedCheckIn.checkCount > 1 && (
+                  <div>
+                    <p className="text-sm text-gray-600">입장 횟수</p>
+                    <p className="text-lg font-semibold text-gray-800">
+                      {selectedCheckIn.checkCount}회차
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 사진 */}
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 mb-2">📷 촬영 사진</p>
+              {selectedCheckIn.photoPath ? (
+                <div className="relative bg-gray-100 rounded-lg overflow-hidden">
+                  <img
+                    src={`/camera/${selectedCheckIn.photoPath}`}
+                    alt="체크인 사진"
+                    className="w-full h-auto"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect fill="%23f3f4f6" width="400" height="300"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" fill="%236b7280" font-size="16"%3E사진을 불러올 수 없습니다%3C/text%3E%3C/svg%3E';
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="bg-gray-100 rounded-lg p-8 text-center text-gray-500">
+                  <p className="text-4xl mb-2">📷</p>
+                  <p>촬영된 사진이 없습니다</p>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => setSelectedCheckIn(null)}
+              className="w-full bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300"
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
