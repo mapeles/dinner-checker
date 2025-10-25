@@ -1,0 +1,54 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// 학생 정보 테이블 (NFC 카드 등록)
+model Student {
+  id          String      @id @default(cuid())
+  nfcId       String      @unique // NFC 카드 고유번호 (10자리)
+  studentId   String      @unique // 학번 (예: "20701", "31024")
+  password    String      // 4자리 비밀번호 (해시화)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  checkIns    CheckIn[]   // 체크인 기록
+}
+
+// 월별 급식 신청자 테이블
+model Applicant {
+  id          String   @id @default(cuid())
+  studentId   String   // 학번
+  month       String   // "2025-10" 형식
+  createdAt   DateTime @default(now())
+  
+  @@unique([studentId, month])
+  @@index([month])
+}
+
+// 일일 체크인 기록 테이블
+model CheckIn {
+  id          String   @id @default(cuid())
+  studentId   String   // 학번
+  student     Student  @relation(fields: [studentId], references: [studentId])
+  date        String   // "2025-10-25" 형식
+  isApplicant Boolean  // 체크인 당시 신청자 여부
+  checkTime   DateTime @default(now())
+  
+  @@index([studentId, date])
+  @@index([date])
+}
+
+// 관리자 계정 테이블
+model Admin {
+  id          String   @id @default(cuid())
+  username    String   @unique
+  password    String   // 해시화된 비밀번호
+  createdAt   DateTime @default(now())
+}
