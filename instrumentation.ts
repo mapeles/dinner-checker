@@ -33,8 +33,8 @@ export async function register() {
         
         const prisma = new PrismaClient();
         
-        const defaultUsername = process.env.ADMIN_USERNAME || 'admin';
-        const defaultPassword = process.env.ADMIN_PASSWORD || 'admin1234';
+        const defaultUsername = process.env.ADMIN_USERNAME || 'shindo';
+        const defaultPassword = process.env.ADMIN_PASSWORD || 'shindo1234';
         
         const hashedPassword = await bcrypt.hash(defaultPassword, 10);
         

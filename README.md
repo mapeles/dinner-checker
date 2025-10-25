@@ -63,8 +63,8 @@ npm run backup
 서버 실행 후 [http://localhost:3000](http://localhost:3000) 접속
 
 ### 기본 관리자 계정
-- **사용자명**: `admin`
-- **비밀번호**: `admin1234`
+- **사용자명**: `shindo`
+- **비밀번호**: `shindo1234`
 
 ## 🔄 데이터베이스 백업
 
@@ -201,8 +201,8 @@ dinner-checker/
 
 ```env
 DATABASE_URL="file:./dev.db"
-ADMIN_USERNAME="admin"
-ADMIN_PASSWORD="admin1234"
+ADMIN_USERNAME="shindo"
+ADMIN_PASSWORD="shindo1234"
 ```
 
 ## 🎨 화면 구성
