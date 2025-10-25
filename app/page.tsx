@@ -483,13 +483,20 @@ export default function Home() {
               >
                 관리자 페이지
               </Link>
+              <span className="text-gray-400">|</span>
+              <Link
+                href="/change-password"
+                className="text-blue-600 hover:text-blue-800 font-semibold"
+              >
+                비밀번호 바꾸기
+              </Link>
             </div>
           </div>
 
           {/* 오른쪽: 결과 및 히스토리 */}
           <div className="space-y-6">
             {/* 현재 결과 표시 */}
-            <div className="bg-white rounded-2xl shadow-xl p-15 min-h-[250px] flex items-center justify-center">
+            <div className="bg-white rounded-2xl shadow-xl p-10 min-h-[250px] flex items-center justify-center">
               {result ? (
                 result.error ? (
                   // 오류 표시
@@ -559,7 +566,7 @@ export default function Home() {
                   최근 {history.length}건
                 </span>
               </h3>
-              <div className="space-y-2 max-h-[250px] overflow-y-auto">
+              <div className="space-y-2 max-h-[230px] overflow-y-auto">
                 {history.length === 0 ? (
                   <p className="text-center text-gray-400 py-8">
                     아직 확인 내역이 없습니다
