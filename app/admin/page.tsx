@@ -1397,7 +1397,7 @@ export default function AdminPage() {
               {selectedCheckIn.photoPath ? (
                 <div className="relative bg-gray-100 rounded-lg overflow-hidden">
                   <img
-                    src={`/camera/${selectedCheckIn.photoPath}`}
+                    src={`/api/camera/photo?path=${encodeURIComponent(selectedCheckIn.photoPath)}`}
                     alt="체크인 사진"
                     className="w-full h-auto"
                     onError={(e) => {
