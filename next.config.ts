@@ -9,6 +9,7 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '2mb',
     },
+    instrumentationHook: true, // DB 백업을 위한 instrumentation 활성화
   },
 };
 

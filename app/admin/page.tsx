@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
-type TabType = 'applicants' | 'registered' | 'checkins';
+type TabType = 'applicants' | 'registered' | 'checkins' | 'backups' | 'settings';
 
 export default function AdminPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -35,6 +35,21 @@ export default function AdminPage() {
   // 체크인 기록 관련
   const [checkIns, setCheckIns] = useState<any[]>([]);
   const [checkInDate, setCheckInDate] = useState('');
+
+  // 백업 관련
+  const [backups, setBackups] = useState<any[]>([]);
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [backupMessage, setBackupMessage] = useState('');
+  const [backupError, setBackupError] = useState('');
+
+  // 설정 관련
+  const [currentUsername, setCurrentUsername] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newUsername, setNewUsername] = useState('');
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [settingsMessage, setSettingsMessage] = useState('');
+  const [settingsError, setSettingsError] = useState('');
 
   useEffect(() => {
     // 현재 날짜 설정
@@ -145,6 +160,202 @@ export default function AdminPage() {
       }
     } catch (err) {
       console.error('Failed to load check-ins:', err);
+    }
+  };
+
+  // 백업 목록 불러오기
+  const loadBackups = async () => {
+    setBackupLoading(true);
+    try {
+      const response = await fetch('/api/admin/backups');
+      const data = await response.json();
+      if (response.ok) {
+        setBackups(data.backups || []);
+      } else {
+        setBackupError(data.error || '백업 목록을 불러오지 못했습니다.');
+      }
+    } catch (err) {
+      setBackupError('백업 목록을 불러오는 중 오류가 발생했습니다.');
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  // 새 백업 생성
+  const handleCreateBackup = async () => {
+    setBackupLoading(true);
+    setBackupError('');
+    setBackupMessage('');
+    
+    try {
+      const response = await fetch('/api/admin/backups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create' }),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setBackupMessage('새 백업이 생성되었습니다.');
+        loadBackups();
+      } else {
+        setBackupError(data.error || '백업 생성에 실패했습니다.');
+      }
+    } catch (err) {
+      setBackupError('백업 생성 중 오류가 발생했습니다.');
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  // 백업 복원
+  const handleRestoreBackup = async (filename: string) => {
+    if (!confirm(`"${filename}" 백업으로 복원하시겠습니까?\n\n현재 데이터베이스는 자동으로 백업됩니다.`)) {
+      return;
+    }
+
+    setBackupLoading(true);
+    setBackupError('');
+    setBackupMessage('');
+    
+    try {
+      const response = await fetch('/api/admin/backups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'restore', filename }),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setBackupMessage('백업이 성공적으로 복원되었습니다. 페이지를 새로고침합니다.');
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      } else {
+        setBackupError(data.error || '백업 복원에 실패했습니다.');
+      }
+    } catch (err) {
+      setBackupError('백업 복원 중 오류가 발생했습니다.');
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  // 백업 삭제
+  const handleDeleteBackup = async (filename: string) => {
+    if (!confirm(`"${filename}" 백업을 삭제하시겠습니까?`)) {
+      return;
+    }
+
+    setBackupLoading(true);
+    setBackupError('');
+    setBackupMessage('');
+    
+    try {
+      const response = await fetch('/api/admin/backups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', filename }),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setBackupMessage('백업 파일이 삭제되었습니다.');
+        loadBackups();
+      } else {
+        setBackupError(data.error || '백업 삭제에 실패했습니다.');
+      }
+    } catch (err) {
+      setBackupError('백업 삭제 중 오류가 발생했습니다.');
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  // 비밀번호 변경
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSettingsError('');
+    setSettingsMessage('');
+
+    if (newAdminPassword !== confirmPassword) {
+      setSettingsError('새 비밀번호가 일치하지 않습니다.');
+      return;
+    }
+
+    if (newAdminPassword.length < 4) {
+      setSettingsError('비밀번호는 최소 4자 이상이어야 합니다.');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/admin/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'changePassword',
+          username,
+          currentPassword,
+          newPassword: newAdminPassword,
+        }),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setSettingsMessage('비밀번호가 성공적으로 변경되었습니다.');
+        setCurrentPassword('');
+        setNewAdminPassword('');
+        setConfirmPassword('');
+      } else {
+        setSettingsError(data.error || '비밀번호 변경에 실패했습니다.');
+      }
+    } catch (err) {
+      setSettingsError('비밀번호 변경 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 사용자명 변경
+  const handleChangeUsername = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSettingsError('');
+    setSettingsMessage('');
+
+    if (!newUsername) {
+      setSettingsError('새 사용자명을 입력하세요.');
+      return;
+    }
+
+    if (newUsername.length < 3) {
+      setSettingsError('사용자명은 최소 3자 이상이어야 합니다.');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/admin/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'changeUsername',
+          username,
+          currentPassword: currentUsername,
+          newUsername,
+        }),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setSettingsMessage(`사용자명이 "${newUsername}"으로 변경되었습니다. 다시 로그인해주세요.`);
+        setCurrentUsername('');
+        setNewUsername('');
+        setTimeout(() => {
+          setIsLoggedIn(false);
+          setUsername('');
+        }, 2000);
+      } else {
+        setSettingsError(data.error || '사용자명 변경에 실패했습니다.');
+      }
+    } catch (err) {
+      setSettingsError('사용자명 변경 중 오류가 발생했습니다.');
     }
   };
 
@@ -305,6 +516,7 @@ export default function AdminPage() {
       if (activeTab === 'applicants') loadApplicants();
       if (activeTab === 'registered') loadRegisteredStudents();
       if (activeTab === 'checkins') loadCheckIns();
+      if (activeTab === 'backups') loadBackups();
     }
   }, [activeTab, isLoggedIn, checkInDate]);
 
@@ -376,21 +588,21 @@ export default function AdminPage() {
       <div className="max-w-7xl mx-auto">
         {/* 헤더 */}
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-800">관리자 대시보드</h1>
               <p className="text-gray-600 mt-1">급식 신청자 및 학생 관리</p>
             </div>
-            <div className="flex gap-4">
+            <div className="flex gap-3">
               <Link
                 href="/"
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200"
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition-colors"
               >
-                메인 페이지
+                ← 메인 페이지
               </Link>
               <button
                 onClick={() => setIsLoggedIn(false)}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600"
+                className="px-4 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-colors"
               >
                 로그아웃
               </button>
@@ -400,7 +612,7 @@ export default function AdminPage() {
 
         {/* 탭 메뉴 */}
         <div className="bg-white rounded-2xl shadow-xl p-2 mb-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
             <button
               onClick={() => setActiveTab('applicants')}
               className={`py-3 px-4 rounded-lg font-semibold transition-all ${
@@ -430,6 +642,26 @@ export default function AdminPage() {
               }`}
             >
               📋 입장 기록
+            </button>
+            <button
+              onClick={() => setActiveTab('backups')}
+              className={`py-3 px-4 rounded-lg font-semibold transition-all ${
+                activeTab === 'backups'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              💾 백업 관리
+            </button>
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`py-3 px-4 rounded-lg font-semibold transition-all ${
+                activeTab === 'settings'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              ⚙️ 계정 설정
             </button>
           </div>
         </div>
@@ -857,6 +1089,223 @@ export default function AdminPage() {
                   <span className="text-gray-400 font-bold">○</span>
                   <span className="text-gray-600">미입장</span>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 백업 관리 탭 */}
+        {activeTab === 'backups' && (
+          <div className="bg-white rounded-2xl shadow-xl p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">💾 데이터베이스 백업 관리</h2>
+              <button
+                onClick={handleCreateBackup}
+                disabled={backupLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-300"
+              >
+                {backupLoading ? '처리 중...' : '새 백업 생성'}
+              </button>
+            </div>
+
+            {backupMessage && (
+              <div className="mb-4 p-4 bg-green-50 border-2 border-green-200 rounded-lg">
+                <p className="text-green-700 font-semibold">{backupMessage}</p>
+              </div>
+            )}
+
+            {backupError && (
+              <div className="mb-4 p-4 bg-red-50 border-2 border-red-200 rounded-lg">
+                <p className="text-red-700 font-semibold">{backupError}</p>
+              </div>
+            )}
+
+            <div className="mb-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+              <h3 className="font-bold text-blue-800 mb-2">⚠️ 백업 관리 안내</h3>
+              <ul className="text-sm text-blue-700 space-y-1">
+                <li>• 서버 시작 시 자동으로 백업이 생성됩니다</li>
+                <li>• 백업 파일은 최대 30개까지 보관되며, 오래된 것부터 자동 삭제됩니다</li>
+                <li>• 백업 복원 시 현재 데이터베이스는 자동으로 백업됩니다</li>
+                <li>• 복원 후에는 페이지가 새로고침됩니다</li>
+              </ul>
+            </div>
+
+            {backupLoading && backups.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                백업 목록을 불러오는 중...
+              </div>
+            ) : backups.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                백업 파일이 없습니다
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {backups.map((backup) => (
+                  <div
+                    key={backup.filename}
+                    className="p-4 border-2 border-gray-200 rounded-lg hover:border-purple-300 transition-all"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <p className="font-bold text-gray-800">{backup.filename}</p>
+                        <div className="flex gap-4 mt-1 text-sm text-gray-600">
+                          <span>📅 {new Date(backup.createdAt).toLocaleString('ko-KR')}</span>
+                          <span>💾 {backup.sizeInMB} MB</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleRestoreBackup(backup.filename)}
+                          disabled={backupLoading}
+                          className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-300 text-sm"
+                        >
+                          복원
+                        </button>
+                        <button
+                          onClick={() => handleDeleteBackup(backup.filename)}
+                          disabled={backupLoading}
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 disabled:bg-gray-300 text-sm"
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 계정 설정 탭 */}
+        {activeTab === 'settings' && (
+          <div className="bg-white rounded-2xl shadow-xl p-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">⚙️ 관리자 계정 설정</h2>
+
+            {settingsMessage && (
+              <div className="mb-4 p-4 bg-green-50 border-2 border-green-200 rounded-lg">
+                <p className="text-green-700 font-semibold">{settingsMessage}</p>
+              </div>
+            )}
+
+            {settingsError && (
+              <div className="mb-4 p-4 bg-red-50 border-2 border-red-200 rounded-lg">
+                <p className="text-red-700 font-semibold">{settingsError}</p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* 비밀번호 변경 */}
+              <div className="p-6 border-2 border-gray-200 rounded-lg">
+                <h3 className="text-xl font-bold text-gray-800 mb-4">🔒 비밀번호 변경</h3>
+                <form onSubmit={handleChangePassword} className="space-y-4">
+                  <div>
+                    <label className="block text-gray-700 font-semibold mb-2">
+                      현재 비밀번호
+                    </label>
+                    <input
+                      type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 font-semibold mb-2">
+                      새 비밀번호
+                    </label>
+                    <input
+                      type="password"
+                      value={newAdminPassword}
+                      onChange={(e) => setNewAdminPassword(e.target.value)}
+                      className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500"
+                      required
+                      minLength={4}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 font-semibold mb-2">
+                      새 비밀번호 확인
+                    </label>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500"
+                      required
+                      minLength={4}
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700"
+                  >
+                    비밀번호 변경
+                  </button>
+                </form>
+              </div>
+
+              {/* 사용자명 변경 */}
+              <div className="p-6 border-2 border-gray-200 rounded-lg">
+                <h3 className="text-xl font-bold text-gray-800 mb-4">👤 사용자명 변경</h3>
+                <form onSubmit={handleChangeUsername} className="space-y-4">
+                  <div>
+                    <label className="block text-gray-700 font-semibold mb-2">
+                      현재 사용자명
+                    </label>
+                    <input
+                      type="text"
+                      value={username}
+                      className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg bg-gray-100 text-gray-600"
+                      disabled
+                      readOnly
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 font-semibold mb-2">
+                      비밀번호 확인
+                    </label>
+                    <input
+                      type="password"
+                      value={currentUsername}
+                      onChange={(e) => setCurrentUsername(e.target.value)}
+                      className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 font-semibold mb-2">
+                      새 사용자명
+                    </label>
+                    <input
+                      type="text"
+                      value={newUsername}
+                      onChange={(e) => setNewUsername(e.target.value)}
+                      className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500"
+                      required
+                      minLength={3}
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700"
+                  >
+                    사용자명 변경
+                  </button>
+                  <p className="text-sm text-gray-600 mt-2">
+                    ⚠️ 사용자명 변경 후 자동으로 로그아웃됩니다
+                  </p>
+                </form>
+              </div>
+            </div>
+
+            {/* 현재 계정 정보 */}
+            <div className="mt-6 p-4 bg-gray-50 border-2 border-gray-200 rounded-lg">
+              <h3 className="font-bold text-gray-800 mb-2">📋 현재 계정 정보</h3>
+              <div className="space-y-1 text-sm text-gray-700">
+                <p><strong>사용자명:</strong> {username}</p>
+                <p><strong>역할:</strong> 관리자</p>
               </div>
             </div>
           </div>

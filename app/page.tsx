@@ -309,10 +309,12 @@ export default function Home() {
 
       if (!response.ok) {
         setError(data.error || '확인 중 오류가 발생했습니다.');
+        setResult({ error: data.error || '확인 중 오류가 발생했습니다.' }); // 오른쪽 결과창에도 오류 표시
         setBgColor('from-red-100 to-red-200');
         playSound('error');
         setTimeout(() => {
           setError('');
+          setResult(null); // 오류 결과도 초기화
           setBgColor('from-blue-50 to-indigo-100');
         }, 3000);
       } else {
@@ -345,10 +347,12 @@ export default function Home() {
       }
     } catch (err) {
       setError('서버 연결 오류가 발생했습니다.');
+      setResult({ error: '서버 연결 오류가 발생했습니다.' }); // 오른쪽 결과창에도 오류 표시
       setBgColor('from-red-100 to-red-200');
       playSound('error');
       setTimeout(() => {
         setError('');
+        setResult(null); // 오류 결과도 초기화
         setBgColor('from-blue-50 to-indigo-100');
       }, 3000);
     } finally {
@@ -487,42 +491,58 @@ export default function Home() {
             {/* 현재 결과 표시 */}
             <div className="bg-white rounded-2xl shadow-xl p-15 min-h-[250px] flex items-center justify-center">
               {result ? (
-                <div
-                  className={`text-center w-full ${
-                    result.isApplicant
-                      ? result.alreadyCheckedIn
-                        ? 'text-orange-600'
-                        : 'text-green-600'
-                      : 'text-red-600'
-                  }`}
-                >
-                  <div className="text-8xl mb-4 animate-bounce">
-                    {result.isApplicant
-                      ? result.alreadyCheckedIn
-                        ? '⚠️'
-                        : '✓'
-                      : '✗'}
+                result.error ? (
+                  // 오류 표시
+                  <div className="text-center w-full text-red-600">
+                    <div className="text-8xl mb-4 animate-bounce">
+                      ✗
+                    </div>
+                    <h2 className="text-3xl font-bold mb-2">
+                      오류
+                    </h2>
+                    <p className="text-xl font-semibold">
+                      {result.error}
+                    </p>
                   </div>
-                  <h2 className="text-6xl font-bold mb-2">
-                    {result.studentInfo.formatted}
-                  </h2>
-                  {result.isApplicant && result.alreadyCheckedIn ? (
-                    <>
-                      <p className="text-4xl font-semibold mb-2">
-                        이미 입장했습니다
-                      </p>
-                      <p className="text-lg opacity-70">
-                        입장 시각: {new Date(result.checkInTime).toLocaleTimeString('ko-KR')}
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-2xl font-semibold">
-                        {result.isApplicant ? '급식 신청자' : '급식 미신청자'}
-                      </p>
-                    </>
-                  )}
-                </div>
+                ) : (
+                  // 정상 결과 표시
+                  <div
+                    className={`text-center w-full ${
+                      result.isApplicant
+                        ? result.alreadyCheckedIn
+                          ? 'text-orange-600'
+                          : 'text-green-600'
+                        : 'text-red-600'
+                    }`}
+                  >
+                    <div className="text-8xl mb-4 animate-bounce">
+                      {result.isApplicant
+                        ? result.alreadyCheckedIn
+                          ? '⚠️'
+                          : '✓'
+                        : '✗'}
+                    </div>
+                    <h2 className="text-6xl font-bold mb-2">
+                      {result.studentInfo.formatted}
+                    </h2>
+                    {result.isApplicant && result.alreadyCheckedIn ? (
+                      <>
+                        <p className="text-4xl font-semibold mb-2">
+                          이미 입장했습니다
+                        </p>
+                        <p className="text-lg opacity-70">
+                          입장 시각: {new Date(result.checkInTime).toLocaleTimeString('ko-KR')}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-2xl font-semibold">
+                          {result.isApplicant ? '급식 신청자' : '급식 미신청자'}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                )
               ) : (
                 <div className="text-center text-gray-400">
                   <div className="text-6xl mb-4">📋</div>
