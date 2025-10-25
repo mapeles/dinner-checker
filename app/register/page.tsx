@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
@@ -17,6 +17,10 @@ function RegisterForm() {
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // 입력 필드 참조
+  const studentIdRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+
   // URL에서 전달된 값 자동 입력
   useEffect(() => {
     if (urlNfcId) {
@@ -26,6 +30,22 @@ function RegisterForm() {
       setStudentId(urlStudentId);
     }
   }, [urlNfcId, urlStudentId]);
+
+  // 자동 포커싱
+  useEffect(() => {
+    // 학번이 자동 입력된 경우 (메인페이지에서 학번 입력 후 넘어옴) -> 비밀번호로 포커스
+    if (urlStudentId) {
+      passwordRef.current?.focus();
+    } 
+    // NFC 카드만 태깅한 경우 (카드는 있지만 학번은 없음) -> 학번으로 포커스
+    else if (urlNfcId) {
+      studentIdRef.current?.focus();
+    }
+    // 둘 다 없는 경우 (직접 등록 페이지 접근) -> 학번으로 포커스
+    else {
+      studentIdRef.current?.focus();
+    }
+  }, [urlStudentId, urlNfcId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -150,6 +170,7 @@ function RegisterForm() {
                 학번 <span className="text-red-500">*</span>
               </label>
               <input
+                ref={studentIdRef}
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
@@ -182,6 +203,7 @@ function RegisterForm() {
                 비밀번호 (4자리) <span className="text-red-500">*</span>
               </label>
               <input
+                ref={passwordRef}
                 type="password"
                 inputMode="numeric"
                 pattern="[0-9]*"
@@ -252,7 +274,7 @@ function RegisterForm() {
 
 export default function RegisterPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">로딩 중...</div>}>
+    <Suspense fallback={<div className="min-h-screen bg-linear-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">로딩 중...</div>}>
       <RegisterForm />
     </Suspense>
   );

@@ -15,6 +15,7 @@ interface CheckHistory {
   isApplicant: boolean;
   isDuplicate?: boolean;
   timestamp: Date;
+  checkTime: string;
 }
 
 export default function Home() {
@@ -30,6 +31,49 @@ export default function Home() {
 
   const inputRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
+
+  // 오늘 날짜 가져오기
+  const getTodayDate = () => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  };
+
+  // DB에서 오늘의 체크인 기록 가져오기
+  const loadTodayCheckIns = async () => {
+    try {
+      const todayDate = getTodayDate();
+      const response = await fetch(`/api/admin/checkins?date=${todayDate}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.checkIns) {
+          // DB 데이터를 history 형식으로 변환 (최신순으로 역순 정렬)
+          const formattedHistory: CheckHistory[] = data.checkIns.map((item: any) => ({
+            id: item.id,
+            studentId: item.studentId,
+            studentInfo: item.studentInfo,
+            isApplicant: item.isApplicant,
+            isDuplicate: item.isDuplicate,
+            timestamp: new Date(item.checkTime),
+            checkTime: item.checkTime,
+          })).reverse();
+          setHistory(formattedHistory);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load check-in history:', err);
+    }
+  };
+
+  // 컴포넌트 마운트 시 오늘의 체크인 기록 로드
+  useEffect(() => {
+    loadTodayCheckIns();
+    
+    // 30초마다 자동 새로고침
+    const interval = setInterval(loadTodayCheckIns, 30000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   // 효과음 재생 함수
   const playSound = (type: 'success' | 'error' | 'warning') => {
@@ -228,16 +272,8 @@ export default function Home() {
           playSound('error');
         }
         
-        // 히스토리에 추가 (모든 체크인 기록)
-        const historyItem: CheckHistory = {
-          id: Date.now().toString(),
-          studentId: data.studentId,
-          studentInfo: data.studentInfo,
-          isApplicant: data.isApplicant,
-          isDuplicate: data.isApplicant && data.alreadyCheckedIn,
-          timestamp: new Date(),
-        };
-        setHistory(prev => [historyItem, ...prev].slice(0, 20));
+        // DB에서 히스토리 다시 로드
+        await loadTodayCheckIns();
         
         // 배경색만 3초 후 초기화 (결과는 유지)
         setTimeout(() => {
@@ -299,16 +335,8 @@ export default function Home() {
           playSound('error');
         }
         
-        // 히스토리에 추가 (모든 체크인 기록)
-        const historyItem: CheckHistory = {
-          id: Date.now().toString(),
-          studentId: data.studentId,
-          studentInfo: data.studentInfo,
-          isApplicant: data.isApplicant,
-          isDuplicate: data.isApplicant && data.alreadyCheckedIn,
-          timestamp: new Date(),
-        };
-        setHistory(prev => [historyItem, ...prev].slice(0, 20));
+        // DB에서 히스토리 다시 로드
+        await loadTodayCheckIns();
         
         // 배경색만 3초 후 초기화 (결과는 유지)
         setTimeout(() => {
@@ -457,7 +485,7 @@ export default function Home() {
           {/* 오른쪽: 결과 및 히스토리 */}
           <div className="space-y-6">
             {/* 현재 결과 표시 */}
-            <div className="bg-white rounded-2xl shadow-xl p-20 min-h-[250px] flex items-center justify-center">
+            <div className="bg-white rounded-2xl shadow-xl p-15 min-h-[250px] flex items-center justify-center">
               {result ? (
                 <div
                   className={`text-center w-full ${
@@ -492,9 +520,6 @@ export default function Home() {
                       <p className="text-2xl font-semibold">
                         {result.isApplicant ? '급식 신청자' : '급식 미신청자'}
                       </p>
-                      <p className="mt-2 text-sm opacity-70">
-                        {result.month} 기준
-                      </p>
                     </>
                   )}
                 </div>
@@ -514,7 +539,7 @@ export default function Home() {
                   최근 {history.length}건
                 </span>
               </h3>
-              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+              <div className="space-y-2 max-h-[250px] overflow-y-auto">
                 {history.length === 0 ? (
                   <p className="text-center text-gray-400 py-8">
                     아직 확인 내역이 없습니다
