@@ -478,17 +478,17 @@ export default function Home() {
               </Link>
               <span className="text-gray-400">|</span>
               <Link
-                href="/admin"
-                className="text-blue-600 hover:text-blue-800 font-semibold"
-              >
-                관리자 페이지
-              </Link>
-              <span className="text-gray-400">|</span>
-              <Link
                 href="/change-password"
                 className="text-blue-600 hover:text-blue-800 font-semibold"
               >
                 비밀번호 바꾸기
+              </Link>
+              <span className="text-gray-400">|</span>
+              <Link
+                href="/admin"
+                className="text-blue-600 hover:text-blue-800 font-semibold"
+              >
+                관리자 페이지
               </Link>
             </div>
           </div>
