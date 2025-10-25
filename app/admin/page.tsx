@@ -382,13 +382,6 @@ export default function AdminPage() {
               <p className="text-gray-600 mt-1">급식 신청자 및 학생 관리</p>
             </div>
             <div className="flex gap-4">
-              <button
-                onClick={handleResetDatabase}
-                disabled={loading}
-                className="px-4 py-2 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 disabled:bg-gray-300 transition-all"
-              >
-                🗑️ DB 초기화
-              </button>
               <Link
                 href="/"
                 className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200"
