@@ -16,7 +16,7 @@ import {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { nfcId, studentId, password, photoPath } = body;
+    const { nfcId, studentId, photoPath } = body;
 
     let student = null;
 
@@ -44,18 +44,11 @@ export async function POST(request: NextRequest) {
         );
       }
     }
-    // 수동 입력으로 확인 (학번 + 비밀번호)
-    else if (studentId && password) {
+    // 수동 입력으로 확인 (학번만)
+    else if (studentId) {
       if (!isValidStudentId(studentId)) {
         return NextResponse.json(
           { error: '학번은 5자리 숫자여야 합니다.' },
-          { status: 400 }
-        );
-      }
-
-      if (!isValidPassword(password)) {
-        return NextResponse.json(
-          { error: '비밀번호는 4자리 숫자여야 합니다.' },
           { status: 400 }
         );
       }
@@ -65,23 +58,19 @@ export async function POST(request: NextRequest) {
       });
 
       if (!student) {
-        return NextResponse.json(
-          { error: '등록되지 않은 학번입니다.' },
-          { status: 404 }
-        );
-      }
-
-      // 비밀번호 확인
-      const isPasswordValid = await verifyPassword(password, student.password);
-      if (!isPasswordValid) {
-        return NextResponse.json(
-          { error: '비밀번호가 일치하지 않습니다.' },
-          { status: 401 }
-        );
+        // 등록되지 않은 학번 - 자동으로 학생 생성 (비밀번호 없이)
+        const tempNfcId = `TEMP${studentId}`;
+        student = await prisma.student.create({
+          data: {
+            nfcId: tempNfcId,
+            studentId,
+            password: undefined,
+          },
+        });
       }
     } else {
       return NextResponse.json(
-        { error: 'NFC ID 또는 학번과 비밀번호를 입력해주세요.' },
+        { error: 'NFC ID 또는 학번을 입력해주세요.' },
         { status: 400 }
       );
     }

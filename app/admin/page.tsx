@@ -29,7 +29,6 @@ export default function AdminPage() {
   const [registeredStudents, setRegisteredStudents] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
-  const [newPassword, setNewPassword] = useState('');
   const [newNfcId, setNewNfcId] = useState('');
 
   // 체크인 기록 관련
@@ -409,22 +408,17 @@ export default function AdminPage() {
     }
   };
 
-  // 학생 정보 변경 (비밀번호 및 NFC ID)
+  // 학생 정보 변경 (NFC ID만)
   const handleUpdateStudent = async () => {
     if (!selectedStudent) return;
 
-    if (newPassword && newPassword.length !== 4) {
-      alert('비밀번호는 4자리여야 합니다');
+    if (!newNfcId) {
+      alert('변경할 NFC ID를 입력하세요');
       return;
     }
 
-    if (newNfcId && newNfcId.length !== 10) {
+    if (newNfcId.length !== 10) {
       alert('NFC ID는 10자리여야 합니다');
-      return;
-    }
-
-    if (!newPassword && !newNfcId) {
-      alert('변경할 정보를 입력하세요');
       return;
     }
 
@@ -434,16 +428,14 @@ export default function AdminPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           studentId: selectedStudent.studentId, 
-          newPassword: newPassword || undefined,
-          newNfcId: newNfcId || undefined
+          newNfcId: newNfcId
         }),
       });
 
       const data = await response.json();
       if (response.ok) {
-        alert('학생 정보가 변경되었습니다');
+        alert('NFC ID가 변경되었습니다');
         setSelectedStudent(null);
-        setNewPassword('');
         setNewNfcId('');
         loadRegisteredStudents();
       } else {
@@ -862,7 +854,7 @@ export default function AdminPage() {
                           <div className="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg font-semibold mb-2">
                             {student.studentInfo.grade}학년 {student.studentInfo.class}반
                           </div>
-                          <p className="text-xs text-gray-500">클릭하여 비밀번호 변경</p>
+                          <p className="text-xs text-gray-500">클릭하여 NFC ID 변경</p>
                         </div>
                       </div>
                     </div>
@@ -871,11 +863,11 @@ export default function AdminPage() {
               )}
             </div>
 
-            {/* 비밀번호/NFC ID 변경 모달 */}
+            {/* NFC ID 변경 모달 */}
             {selectedStudent && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-2xl p-6 max-w-md w-full">
-                  <h3 className="text-xl font-bold mb-4">학생 정보 변경</h3>
+                  <h3 className="text-xl font-bold mb-4">NFC ID 변경</h3>
                   <div className="mb-4 p-4 bg-purple-50 rounded-lg">
                     <p className="text-lg font-bold text-purple-700">
                       {selectedStudent.studentInfo.formatted}
@@ -889,28 +881,15 @@ export default function AdminPage() {
                   </div>
                   <div className="mb-4">
                     <label className="block text-gray-700 font-semibold mb-2">
-                      새 NFC ID (10자리) - 선택사항
+                      새 NFC ID (10자리)
                     </label>
                     <input
                       type="text"
                       value={newNfcId}
                       onChange={(e) => setNewNfcId(e.target.value)}
                       className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 text-gray-900 text-center text-lg font-mono"
-                      placeholder="변경하지 않으려면 비워두세요"
+                      placeholder="10자리 숫자 입력"
                       maxLength={10}
-                    />
-                  </div>
-                  <div className="mb-4">
-                    <label className="block text-gray-700 font-semibold mb-2">
-                      새 비밀번호 (4자리) - 선택사항
-                    </label>
-                    <input
-                      type="password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 text-gray-900 text-center text-2xl font-mono tracking-widest"
-                      placeholder="••••"
-                      maxLength={4}
                     />
                   </div>
                   <div className="flex gap-2">
@@ -923,7 +902,6 @@ export default function AdminPage() {
                     <button
                       onClick={() => {
                         setSelectedStudent(null);
-                        setNewPassword('');
                         setNewNfcId('');
                       }}
                       className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg font-semibold hover:bg-gray-300"

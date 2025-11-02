@@ -23,9 +23,6 @@ export default function Home() {
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showPasswordInput, setShowPasswordInput] = useState(false);
-  const [tempStudentId, setTempStudentId] = useState('');
-  const [password, setPassword] = useState('');
   const [history, setHistory] = useState<CheckHistory[]>([]);
   const [bgColor, setBgColor] = useState('from-blue-50 to-indigo-100'); // 배경색 상태
   
@@ -34,15 +31,17 @@ export default function Home() {
   const [cameraError, setCameraError] = useState('');
 
   const inputRef = useRef<HTMLInputElement>(null);
-  const passwordRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // 오늘 날짜 가져오기
+  // 오늘 날짜 가져오기 (로컬 시간대 기준)
   const getTodayDate = () => {
     const today = new Date();
-    return today.toISOString().split('T')[0];
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   // DB에서 오늘의 체크인 기록 가져오기
@@ -252,21 +251,13 @@ export default function Home() {
 
   // 항상 입력 필드에 포커스
   useEffect(() => {
-    if (!showPasswordInput) {
-      inputRef.current?.focus();
-    } else {
-      passwordRef.current?.focus();
-    }
-  }, [result, showPasswordInput]);
+    inputRef.current?.focus();
+  }, [result]);
 
   // 페이지 클릭 시 포커스 유지
   useEffect(() => {
     const handleFocus = () => {
-      if (!showPasswordInput) {
-        inputRef.current?.focus();
-      } else {
-        passwordRef.current?.focus();
-      }
+      inputRef.current?.focus();
     };
 
     // 포커스가 벗어났을 때 다시 포커스
@@ -288,7 +279,7 @@ export default function Home() {
       window.removeEventListener('click', handleClick);
       clearInterval(interval);
     };
-  }, [showPasswordInput]);
+  }, []);
 
   // 입력 처리
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -302,9 +293,9 @@ export default function Home() {
         await checkNfc(trimmedInput);
         setInput('');
       }
-      // 5자리 = 학번 (등록 여부 확인 후 비밀번호 입력 또는 등록 페이지로 이동)
+      // 5자리 = 학번 - 바로 체크인 처리
       else if (trimmedInput.length === 5 && /^\d{5}$/.test(trimmedInput)) {
-        await checkStudentExists(trimmedInput);
+        await checkManual(trimmedInput);
         setInput('');
       }
       // 그 외
@@ -312,54 +303,6 @@ export default function Home() {
         setError('10자리 NFC 번호 또는 5자리 학번을 입력하세요.');
         setInput('');
       }
-    }
-  };
-
-  // 학생 등록 여부 확인
-  const checkStudentExists = async (studentId: string) => {
-    try {
-      const response = await fetch('/api/nfc/check-student', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentId }),
-      });
-
-      const data = await response.json();
-
-      if (data.exists) {
-        // 등록된 학생 - 비밀번호 입력 화면으로
-        setTempStudentId(studentId);
-        setShowPasswordInput(true);
-      } else {
-        // 미등록 학생 - 등록 페이지로 이동 (NFC ID 없이)
-        window.location.href = `/register?studentId=${studentId}`;
-      }
-    } catch (err) {
-      setError('확인 중 오류가 발생했습니다.');
-      setTimeout(() => setError(''), 3000);
-    }
-  };
-
-  // 비밀번호 입력 처리
-  const handlePasswordKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      
-      if (password.length === 4 && /^\d{4}$/.test(password)) {
-        await checkManual(tempStudentId, password);
-        setPassword('');
-        setShowPasswordInput(false);
-        setTempStudentId('');
-      } else {
-        setError('4자리 비밀번호를 입력하세요.');
-        setPassword('');
-      }
-    } else if (e.key === 'Escape') {
-      // ESC로 취소
-      setShowPasswordInput(false);
-      setPassword('');
-      setTempStudentId('');
-      setError('');
     }
   };
 
@@ -436,8 +379,8 @@ export default function Home() {
     }
   };
 
-  // 수동 입력 확인
-  const checkManual = async (studentId: string, password: string) => {
+  // 수동 입력 확인 (학번만)
+  const checkManual = async (studentId: string) => {
     setLoading(true);
     setError('');
 
@@ -448,7 +391,7 @@ export default function Home() {
       const response = await fetch('/api/nfc/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentId, password, photoPath }),
+        body: JSON.stringify({ studentId, photoPath }),
       });
 
       const data = await response.json();
@@ -506,6 +449,32 @@ export default function Home() {
     }
   };
 
+  // 체크인 취소 함수
+  const handleCancelCheckIn = async (checkInId: string) => {
+    if (!confirm('이 체크인을 취소하시겠습니까?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/admin/checkins/cancel', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ checkInId }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // 히스토리 다시 로드
+        await loadTodayCheckIns();
+      } else {
+        alert(data.error || '취소 중 오류가 발생했습니다.');
+      }
+    } catch (err) {
+      alert('서버 연결 오류가 발생했습니다.');
+    }
+  };
+
   return (
     <div className={`min-h-screen bg-linear-to-br ${bgColor} transition-colors duration-500 p-4`}>
       {/* 숨겨진 카메라 (렌더링은 되지만 보이지 않음) */}
@@ -534,90 +503,43 @@ export default function Home() {
 
             {/* 메인 입력 카드 */}
             <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
-              {!showPasswordInput ? (
-                // 통합 입력 모드
-                <div className="text-center">
-                  <div className="mb-6">
-                    <div className="text-6xl mb-4">💳</div>
-                    <h2 className="text-4xl font-bold text-gray-800 mb-2">
-                      학번 입력
-                    </h2>
-                    <p className="text-gray-500 text-2xl">
-                      학번을 입력하고 Enter를 누르세요
-                    </p>
-                  </div>
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    value={input}
-                    onChange={(e) => {
-                      const value = e.target.value.replace(/[^0-9]/g, '');
-                      setInput(value);
-                    }}
-                    onKeyDown={handleKeyDown}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-center text-8xl font-mono tracking-widest focus:outline-none focus:border-blue-500 placeholder:text-gray-500 text-gray-900"
-                    placeholder="00000"
-                    maxLength={10}
-                    autoFocus
-                    disabled={loading}
-                  />
-                  <p className="mt-2 text-sm text-gray-400">
-                    {input.length > 0 && (
-                      input.length === 10 
-                        ? '✓ NFC 카드 번호' 
-                        : input.length === 5 
-                        ? '✓ 학번 (Enter 후 비밀번호 입력)' 
-                        : `${input.length}자리`
-                    )}
+              <div className="text-center">
+                <div className="mb-6">
+                  <div className="text-6xl mb-4">💳</div>
+                  <h2 className="text-4xl font-bold text-gray-800 mb-2">
+                    학번 입력
+                  </h2>
+                  <p className="text-gray-500 text-2xl">
+                    학번을 입력하고 Enter를 누르세요
                   </p>
                 </div>
-              ) : (
-                // 비밀번호 입력 모드
-                <div className="text-center">
-                  <div className="mb-6">
-                    <div className="text-6xl mb-4">🔒</div>
-                    <h2 className="text-4xl font-bold text-gray-800 mb-2">
-                      학번: {tempStudentId}
-                    </h2>
-                    <p className="text-gray-500 text-2xl">
-                      비밀번호 4자리를 입력하세요
-                    </p>
-                  </div>
-                  <input
-                    ref={passwordRef}
-                    type="password"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    value={password}
-                    onChange={(e) => {
-                      const value = e.target.value.replace(/[^0-9]/g, '');
-                      setPassword(value);
-                    }}
-                    onKeyDown={handlePasswordKeyDown}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-center text-8xl font-mono tracking-widest focus:outline-none focus:border-blue-500 placeholder:text-gray-500 text-gray-900"
-                    placeholder="••••"
-                    maxLength={4}
-                    autoFocus
-                    disabled={loading}
-                  />
-                  <p className="mt-2 text-sm text-gray-400">
-                    {password.length}/4 자리
-                  </p>
-                  <button
-                    onClick={() => {
-                      setShowPasswordInput(false);
-                      setPassword('');
-                      setTempStudentId('');
-                      setError('');
-                    }}
-                    className="mt-4 text-sm text-gray-500 hover:text-gray-700"
-                  >
-                    취소 (ESC)
-                  </button>
-                </div>
-              )}
+                <input
+                  ref={inputRef}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={input}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9]/g, '');
+                    setInput(value);
+                  }}
+                  onKeyDown={handleKeyDown}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-center text-8xl font-mono tracking-widest focus:outline-none focus:border-blue-500 placeholder:text-gray-500 text-gray-900"
+                  placeholder="00000"
+                  maxLength={10}
+                  autoFocus
+                  disabled={loading}
+                />
+                <p className="mt-2 text-sm text-gray-400">
+                  {input.length > 0 && (
+                    input.length === 10 
+                      ? '✓ NFC 카드 번호' 
+                      : input.length === 5 
+                      ? '✓ 학번' 
+                      : `${input.length}자리`
+                  )}
+                </p>
+              </div>
             </div>
 
             {/* 에러 메시지 */}
@@ -629,20 +551,6 @@ export default function Home() {
 
             {/* 하단 링크 */}
             <div className="flex justify-center gap-4 text-sm">
-              <Link
-                href="/register"
-                className="text-blue-600 hover:text-blue-800 font-semibold"
-              >
-                학번 등록하기
-              </Link>
-              <span className="text-gray-400">|</span>
-              <Link
-                href="/change-password"
-                className="text-blue-600 hover:text-blue-800 font-semibold"
-              >
-                비밀번호 바꾸기
-              </Link>
-              <span className="text-gray-400">|</span>
               <Link
                 href="/admin"
                 className="text-blue-600 hover:text-blue-800 font-semibold"
@@ -743,7 +651,7 @@ export default function Home() {
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-1">
                           <div className={`text-2xl ${
                             item.isDuplicate
                               ? 'text-orange-600'
@@ -753,7 +661,7 @@ export default function Home() {
                           }`}>
                             {item.isDuplicate ? '⚠️' : item.isApplicant ? '✓' : '✗'}
                           </div>
-                          <div>
+                          <div className="flex-1">
                             <p className={`font-bold ${
                               item.isDuplicate
                                 ? 'text-orange-700'
@@ -768,14 +676,23 @@ export default function Home() {
                             </p>
                           </div>
                         </div>
-                        <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                          item.isDuplicate
-                            ? 'bg-orange-100 text-orange-700'
-                            : item.isApplicant
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-red-100 text-red-700'
-                        }`}>
-                          {item.isDuplicate ? '중복' : item.isApplicant ? '신청' : '미신청'}
+                        <div className="flex items-center gap-2">
+                          <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                            item.isDuplicate
+                              ? 'bg-orange-100 text-orange-700'
+                              : item.isApplicant
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-red-100 text-red-700'
+                          }`}>
+                            {item.isDuplicate ? '중복' : item.isApplicant ? '신청' : '미신청'}
+                          </div>
+                          <button
+                            onClick={() => handleCancelCheckIn(item.id)}
+                            className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 transition-colors"
+                            title="체크인 취소"
+                          >
+                            취소
+                          </button>
                         </div>
                       </div>
                     </div>

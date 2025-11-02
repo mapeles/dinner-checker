@@ -3,19 +3,16 @@ import { prisma } from '@/lib/db';
 import {
   isValidNfcId,
   isValidStudentId,
-  isValidPassword,
-  hashPassword,
-  verifyPassword,
 } from '@/lib/utils';
 
 /**
  * POST /api/nfc/register
- * NFC 카드 최초 등록
+ * NFC 카드 최초 등록 (비밀번호 없이 학번만)
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { nfcId, studentId, password } = body;
+    const { nfcId, studentId } = body;
 
     // 입력 검증
     const isTempNfc = nfcId.startsWith('TEMP');
@@ -30,13 +27,6 @@ export async function POST(request: NextRequest) {
     if (!isValidStudentId(studentId)) {
       return NextResponse.json(
         { error: '학번은 5자리 숫자여야 합니다.' },
-        { status: 400 }
-      );
-    }
-
-    if (!isValidPassword(password)) {
-      return NextResponse.json(
-        { error: '비밀번호는 4자리 숫자여야 합니다.' },
         { status: 400 }
       );
     }
@@ -62,17 +52,7 @@ export async function POST(request: NextRequest) {
 
       // 학번이 이미 존재하는 경우 (병합)
       if (existingStudent) {
-        // 비밀번호 확인
-        const isPasswordValid = await verifyPassword(password, existingStudent.password);
-        
-        if (!isPasswordValid) {
-          return NextResponse.json(
-            { error: '이미 등록된 학생입니다. 비밀번호 일치 여부를 확인해주세요.' },
-            { status: 401 }
-          );
-        }
-
-        // 비밀번호가 일치하면 NFC ID 업데이트 (병합)
+        // NFC ID 업데이트 (병합)
         await prisma.student.update({
           where: { studentId },
           data: { nfcId },
@@ -94,14 +74,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 새로운 학생 등록
-    const hashedPassword = await hashPassword(password);
-
+    // 새로운 학생 등록 (비밀번호 없이)
     const student = await prisma.student.create({
       data: {
         nfcId,
         studentId,
-        password: hashedPassword,
       },
     });
 

@@ -15,7 +15,7 @@ model Student {
   id          String      @id @default(cuid())
   nfcId       String      @unique // NFC 카드 고유번호 (10자리)
   studentId   String      @unique // 학번 (예: "20701", "31024")
-  password    String      // 4자리 비밀번호 (해시화)
+  password    String?     // 4자리 비밀번호 (해시화) - optional (비밀번호 제거로 인해 nullable)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   checkIns    CheckIn[]   // 체크인 기록
