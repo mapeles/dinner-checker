@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
-type TabType = 'applicants' | 'registered' | 'checkins' | 'backups' | 'settings';
+type TabType = 'applicants' | 'registered' | 'checkins' | 'backups' | 'settings' | 'migration';
 
 export default function AdminPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -41,6 +41,12 @@ export default function AdminPage() {
   const [backupLoading, setBackupLoading] = useState(false);
   const [backupMessage, setBackupMessage] = useState('');
   const [backupError, setBackupError] = useState('');
+
+  // 마이그레이션 관련
+  const [migrationFile, setMigrationFile] = useState<File | null>(null);
+  const [migrationResult, setMigrationResult] = useState<any>(null);
+  const [migrationError, setMigrationError] = useState('');
+  const [migrationLoading, setMigrationLoading] = useState(false);
 
   // 설정 관련
   const [currentUsername, setCurrentUsername] = useState('');
@@ -480,6 +486,41 @@ export default function AdminPage() {
     }
   };
 
+  // 학번 마이그레이션
+  const handleMigration = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!migrationFile) return;
+
+    setMigrationError('');
+    setMigrationResult(null);
+    setMigrationLoading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', migrationFile);
+
+      const response = await fetch('/api/admin/migrate', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMigrationError(data.error || '마이그레이션 실패');
+      } else {
+        setMigrationResult(data);
+        setMigrationFile(null);
+        const fileInput = document.getElementById('migration-file-input') as HTMLInputElement;
+        if (fileInput) fileInput.value = '';
+      }
+    } catch (err) {
+      setMigrationError('서버 연결 오류');
+    } finally {
+      setMigrationLoading(false);
+    }
+  };
+
   // 학생 검색 필터링
   const filteredStudents = registeredStudents.filter((student) => {
     if (!searchQuery) return true;
@@ -605,7 +646,7 @@ export default function AdminPage() {
 
         {/* 탭 메뉴 */}
         <div className="bg-white rounded-2xl shadow-xl p-2 mb-6">
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
+          <div className="grid grid-cols-2 lg:grid-cols-6 gap-2">
             <button
               onClick={() => setActiveTab('applicants')}
               className={`py-3 px-4 rounded-lg font-semibold transition-all ${
@@ -655,6 +696,16 @@ export default function AdminPage() {
               }`}
             >
               ⚙️ 계정 설정
+            </button>
+            <button
+              onClick={() => setActiveTab('migration')}
+              className={`py-3 px-4 rounded-lg font-semibold transition-all ${
+                activeTab === 'migration'
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              🔄 학번 마이그레이션
             </button>
           </div>
         </div>
@@ -1291,6 +1342,90 @@ export default function AdminPage() {
                 <p><strong>역할:</strong> 관리자</p>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* 학번 마이그레이션 탭 */}
+        {activeTab === 'migration' && (
+          <div className="bg-white rounded-2xl shadow-xl p-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">🔄 학번 마이그레이션</h2>
+            <p className="text-gray-500 mb-6 text-sm">학년 변경에 따라 기존 학번을 새 학번으로 일괄 업데이트합니다.</p>
+
+            {/* 안내 */}
+            <div className="mb-6 p-4 bg-orange-50 border-2 border-orange-200 rounded-lg">
+              <h3 className="font-bold text-orange-800 mb-2">📋 파일 형식 안내</h3>
+              <ul className="text-sm text-orange-700 space-y-1">
+                <li>• CSV 또는 Excel(.xlsx/.xls) 파일을 사용하세요.</li>
+                <li>• 첫 행에 <strong>input</strong>(기존 학번), <strong>output</strong>(새 학번) 헤더가 있으면 해당 열을 자동 인식합니다.</li>
+                <li>• 헤더가 없으면 <strong>1열 = 기존 학번</strong>, <strong>2열 = 새 학번</strong>으로 처리합니다 (첫 행 포함).</li>
+                <li>• 데이터베이스에 <strong>없는 학번</strong>은 자동으로 건너뜁니다.</li>
+                <li>• 새 학번이 이미 다른 학생에게 등록되어 있으면 충돌로 처리합니다.</li>
+                <li>• 학생 정보, 신청 기록, 입장 기록이 모두 새 학번으로 업데이트됩니다.</li>
+              </ul>
+            </div>
+
+            <form onSubmit={handleMigration}>
+              <div className="mb-4">
+                <label className="block text-gray-700 font-semibold mb-2">마이그레이션 파일</label>
+                <input
+                  id="migration-file-input"
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  onChange={(e) => setMigrationFile(e.target.files?.[0] || null)}
+                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 text-gray-900"
+                  required
+                />
+              </div>
+
+              {migrationError && (
+                <div className="mb-4 bg-red-50 border-2 border-red-200 rounded-lg p-3">
+                  <p className="text-red-600 text-sm font-semibold">{migrationError}</p>
+                </div>
+              )}
+
+              {migrationResult && (
+                <div className="mb-4 space-y-3">
+                  <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4">
+                    <p className="text-green-700 font-bold text-lg mb-1">✅ 마이그레이션 완료</p>
+                    <div className="grid grid-cols-3 gap-4 mt-2">
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-green-600">{migrationResult.migrated}</p>
+                        <p className="text-sm text-gray-600">성공</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-gray-500">{migrationResult.skipped}</p>
+                        <p className="text-sm text-gray-600">스킵 (미등록)</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-red-500">{migrationResult.conflicts?.length ?? 0}</p>
+                        <p className="text-sm text-gray-600">충돌</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {migrationResult.conflicts && migrationResult.conflicts.length > 0 && (
+                    <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4">
+                      <p className="font-bold text-red-700 mb-2">⚠️ 충돌 목록 (처리되지 않은 항목)</p>
+                      <div className="space-y-1 max-h-40 overflow-y-auto">
+                        {migrationResult.conflicts.map((c: any, i: number) => (
+                          <p key={i} className="text-sm text-red-600">
+                            <span className="font-mono">{c.oldId}</span> → <span className="font-mono">{c.newId}</span>: {c.reason}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={migrationLoading || !migrationFile}
+                className="w-full bg-orange-500 text-white py-3 rounded-lg font-bold hover:bg-orange-600 disabled:bg-gray-300 transition-all"
+              >
+                {migrationLoading ? '마이그레이션 중...' : '마이그레이션 실행'}
+              </button>
+            </form>
           </div>
         )}
       </div>
