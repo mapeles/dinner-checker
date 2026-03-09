@@ -47,6 +47,7 @@ export default function AdminPage() {
   const [migrationResult, setMigrationResult] = useState<any>(null);
   const [migrationError, setMigrationError] = useState('');
   const [migrationLoading, setMigrationLoading] = useState(false);
+  const [deleteGraduates, setDeleteGraduates] = useState(false);
 
   // 설정 관련
   const [currentUsername, setCurrentUsername] = useState('');
@@ -498,6 +499,7 @@ export default function AdminPage() {
     try {
       const formData = new FormData();
       formData.append('file', migrationFile);
+      formData.append('deleteGraduates', deleteGraduates.toString());
 
       const response = await fetch('/api/admin/migrate', {
         method: 'POST',
@@ -1377,6 +1379,25 @@ export default function AdminPage() {
                 />
               </div>
 
+              <div className="mb-4 p-4 border-2 rounded-lg transition-all"
+                style={{ borderColor: deleteGraduates ? '#ef4444' : '#e5e7eb', backgroundColor: deleteGraduates ? '#fef2f2' : '#f9fafb' }}
+              >
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={deleteGraduates}
+                    onChange={(e) => setDeleteGraduates(e.target.checked)}
+                    className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                  />
+                  <span className="font-semibold text-gray-800">졸업생(3학년 이상) 삭제 후 마이그레이션</span>
+                </label>
+                <p className="mt-1 ml-6 text-sm" style={{ color: deleteGraduates ? '#b91c1c' : '#6b7280' }}>
+                  {deleteGraduates
+                    ? '⚠️ 학번이 30000 이상인 3학년 학생(NFC 정보, 입장 기록 포함)을 모두 삭제한 뒤 마이그레이션합니다.'
+                    : '체크하면 마이그레이션 전에 3학년 이상 학생을 전체 삭제합니다.'}
+                </p>
+              </div>
+
               {migrationError && (
                 <div className="mb-4 bg-red-50 border-2 border-red-200 rounded-lg p-3">
                   <p className="text-red-600 text-sm font-semibold">{migrationError}</p>
@@ -1387,10 +1408,16 @@ export default function AdminPage() {
                 <div className="mb-4 space-y-3">
                   <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4">
                     <p className="text-green-700 font-bold text-lg mb-1">✅ 마이그레이션 완료</p>
-                    <div className="grid grid-cols-3 gap-4 mt-2">
+                    <div className={`grid gap-4 mt-2 ${migrationResult.deletedGraduates > 0 ? 'grid-cols-4' : 'grid-cols-3'}`}>
+                      {migrationResult.deletedGraduates > 0 && (
+                        <div className="text-center">
+                          <p className="text-2xl font-bold text-red-600">{migrationResult.deletedGraduates}</p>
+                          <p className="text-sm text-gray-600">졸업생 삭제</p>
+                        </div>
+                      )}
                       <div className="text-center">
                         <p className="text-2xl font-bold text-green-600">{migrationResult.migrated}</p>
-                        <p className="text-sm text-gray-600">성공</p>
+                        <p className="text-sm text-gray-600">학번 변경</p>
                       </div>
                       <div className="text-center">
                         <p className="text-2xl font-bold text-gray-500">{migrationResult.skipped}</p>

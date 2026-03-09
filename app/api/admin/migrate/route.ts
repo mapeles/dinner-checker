@@ -14,6 +14,7 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
+    const deleteGraduates = formData.get('deleteGraduates') === 'true';
 
     if (!file) {
       return NextResponse.json({ error: '파일을 선택해주세요.' }, { status: 400 });
@@ -84,6 +85,28 @@ export async function POST(request: NextRequest) {
       pairMap.set(oldId, newId);
     }
 
+    // ── 졸업생(3학년 이상) 삭제 ──────────────────────────────────────────────
+    // studentId가 '30000' 이상인 학생 = 3학년 이상
+    // 순서: CheckIn(FK 참조) 먼저 삭제 → Applicant → Student
+    let deletedGraduates = 0;
+    if (deleteGraduates) {
+      const graduates = await prisma.student.findMany({
+        where: { studentId: { gte: '30000' } },
+        select: { studentId: true },
+      });
+      const graduateIds = graduates.map((s) => s.studentId);
+
+      if (graduateIds.length > 0) {
+        await prisma.$transaction(async (tx) => {
+          await tx.checkIn.deleteMany({ where: { studentId: { in: graduateIds } } });
+          await tx.applicant.deleteMany({ where: { studentId: { in: graduateIds } } });
+          await tx.student.deleteMany({ where: { studentId: { in: graduateIds } } });
+        });
+        deletedGraduates = graduateIds.length;
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     let migrated = 0;
     let skipped = 0;
     const conflicts: { oldId: string; newId: string; reason: string }[] = [];
@@ -146,6 +169,7 @@ export async function POST(request: NextRequest) {
       skipped,
       conflicts,
       total: pairMap.size,
+      deletedGraduates,
     });
   } catch (error) {
     console.error('Migration error:', error);
