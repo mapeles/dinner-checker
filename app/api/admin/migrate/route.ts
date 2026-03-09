@@ -117,24 +117,26 @@ export async function POST(request: NextRequest) {
       }
 
       // 트랜잭션으로 일괄 업데이트
-      // SQLite는 FK 제약이 기본 비활성화이므로 순서: CheckIn → Applicant → Student
-      await prisma.$transaction([
-        // 체크인 기록의 studentId 업데이트 (FK 참조)
-        prisma.checkIn.updateMany({
+      // FK 순서: Student 먼저 업데이트 → CheckIn/Applicant 업데이트
+      // (CheckIn.studentId → Student.studentId FK가 있으므로
+      //  newId가 Student에 존재해야 CheckIn 업데이트 가능)
+      await prisma.$transaction(async (tx) => {
+        // 1. 학생 테이블의 studentId 업데이트 (FK 대상 먼저 변경)
+        await tx.student.update({
           where: { studentId: oldId },
           data: { studentId: newId },
-        }),
-        // 신청자 목록의 studentId 업데이트 (FK 없음)
-        prisma.applicant.updateMany({
+        });
+        // 2. 체크인 기록의 studentId 업데이트 (FK 참조 - 이제 newId가 존재함)
+        await tx.checkIn.updateMany({
           where: { studentId: oldId },
           data: { studentId: newId },
-        }),
-        // 학생 테이블의 studentId 업데이트
-        prisma.student.update({
+        });
+        // 3. 신청자 목록의 studentId 업데이트 (FK 없음)
+        await tx.applicant.updateMany({
           where: { studentId: oldId },
           data: { studentId: newId },
-        }),
-      ]);
+        });
+      });
 
       migrated++;
     }
